@@ -230,7 +230,10 @@ class Gelbooru:
         # Otherwise, let's pull a random ID from the number of posts
         offset = randint(0, int(min(count, 20000)/limit))
 
-        return await self.search_posts(tags=tags, exclude_tags=exclude_tags, limit=limit, page=offset)
+        results=await self.search_posts(tags=tags, exclude_tags=exclude_tags, limit=limit, page=offset)
+        if not isinstance(results, list):
+            results=[results]
+        return results
 
     async def search_posts(self, *, tags: Optional[List[str]] = None,
                            exclude_tags: Optional[List[str]] = None,
