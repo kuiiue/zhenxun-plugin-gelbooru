@@ -237,7 +237,7 @@ class Gelbooru:
 
     async def search_posts(self, *, tags: Optional[List[str]] = None,
                            exclude_tags: Optional[List[str]] = None,
-                           limit: int = 100,
+                           limit: int = 20,
                            page: int = 0) -> Union[List[GelbooruImage], GelbooruImage]:
         """
         Search for images with the optionally specified tag(s)
@@ -273,10 +273,7 @@ class Gelbooru:
             else [GelbooruImage(payload['posts']['post'], self)]
 
         # Return the first result if we have a limit of 1 explicitly set
-        if limit == 1:
-            return result[0]
-        else:
-            return result
+        return result
 
     async def tag_list(self, *, name: Union[str, List[str], None] = None,
                        name_pattern: Optional[str] = None,
