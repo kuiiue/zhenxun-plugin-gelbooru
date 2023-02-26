@@ -3,7 +3,6 @@ import os
 import reprlib
 import xml
 from datetime import datetime
-from random import randint
 from typing import *
 from urllib.parse import urlparse
 
@@ -192,48 +191,6 @@ class Gelbooru:
             raise GelbooruNotFoundException(f"Could not find a post with the ID {post_id}")
 
         return GelbooruImage(payload['posts']['post'], self)
-
-    async def random_posts(self, *, tags: Optional[List[str]] = None,
-                          exclude_tags: Optional[List[str]] = None,
-                          limit: int = 100) -> Optional[List[GelbooruImage]]:
-        """
-        Search for and return a single random image with the specified tags.
-        Args:
-            tags (list of str): A list of tags to search for
-            exclude_tags (list of str): A list of tags to EXCLUDE from search results
-        Returns:
-            GelbooruImage or None: Returns None if no posts are found with the specified tags.
-        """
-        endpoint = self._endpoint('post')
-        endpoint.args['limit'] = limit
-
-        # Apply basic tag formatting
-        tags = self._format_tags(tags, exclude_tags)
-        if tags:
-            endpoint.args['tags'] = ' '.join(tags)
-
-        # Run the initial query to get the number of posts available
-        payload = await self._request(str(endpoint))
-        try:
-            payload = xmltodict.parse(payload)
-
-            # Cross compatability with older Booru API's
-            payload = {k.strip('@'): v for k, v in payload.items()}
-        except xml.parsers.expat.ExpatError:
-            raise GelbooruException("Gelbooru returned a malformed response")
-
-        # Count is 0? We have no results to fetch then
-        count = int(payload['posts']['@count'])
-        if not count:
-            return None
-
-        # Otherwise, let's pull a random ID from the number of posts
-        offset = randint(0, int(min(count, 20000)/limit))
-
-        results=await self.search_posts(tags=tags, exclude_tags=exclude_tags, limit=limit, page=offset)
-        if not isinstance(results, list):
-            results=[results]
-        return results
 
     async def search_posts(self, *, tags: Optional[List[str]] = None,
                            exclude_tags: Optional[List[str]] = None,

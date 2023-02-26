@@ -3,7 +3,7 @@ from utils.message_builder import custom_forward_msg, image
 from utils.http_utils import AsyncHttpx
 from utils.utils import is_number
 from services.log import logger
-from nonebot.adapters.onebot.v11 import Bot, ActionFailed, NetworkError, MessageEvent, Message
+from nonebot.adapters.onebot.v11 import Bot, ActionFailed, NetworkError, MessageEvent, GroupMessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot import on_command
 import asyncio
@@ -44,9 +44,9 @@ async def get_random_gelbooru(text):
         return None
     if not results:
         return None
-    urls=[]
+    urls={}
     for result in results:
-        urls.append(str(result))
+        urls[result.id]=str(result)
     return urls
 
 @gel.handle()
@@ -57,27 +57,43 @@ async def _(bot: Bot, event: MessageEvent, arg: Message=CommandArg()):
         logger.info(f"search failure, text: {text}")
         await gel.finish("搜索出错！", at_sender=True)
     msg_list=[]
-    l=len(urls)
-    for i in range(l):
-        url=urls[i]
-        logger.info(f"({i+1}/{l})url: {url}")
-        img_id=len(os.listdir(gel_path))
-        path=gel_path/f"{img_id}.jpg"
-        if await AsyncHttpx.download_file(url, path):
-            resize_thumb(path)
-            msg_list.append(f"({i+1}/{l})"+image(path))
+    for gel_id in urls:
+        url=urls[gel_id]
+        logger.info(f"id: {gel_id}, url: {url}")
+        tail=f"{gel_id}.jpg"
+        path=gel_path/tail
+        if path.exists():
+            logger.info(f"{tail}已存在")
+            msg_list.append(f"gelbooru_id: {gel_id}"+image(path))
         else:
-            msg_list.append(f"({i+1}/{l})图片下载失败！")
-            logger.info(f"({i+1}/{l})download failure, text: {text}")
-    try:
-        await bot.send_group_forward_msg(
-            group_id=event.group_id, 
-            messages=custom_forward_msg(msg_list, bot.self_id)
-        )
-        logger.info(f"success, text: {text}")
-    except ActionFailed:
-        await gel.send("发送失败！账号可能被风控！")
-        logger.info(f"ActionFailed, text: {text}")
-    except NetworkError:
-        await gel.send("发送失败！网络连接失败！")
-        logger.info(f"NetworkError, text: {text}")
+            if await AsyncHttpx.download_file(url, path):
+                resize_thumb(path)
+                msg_list.append(f"gelbooru_id: {gel_id}"+image(path))
+            else:
+                msg_list.append(f"gelbooru_id: {gel_id} 图片下载失败！")
+                logger.info(f"id: {gel_id} download failure, text: {text}")
+    if isinstance(event, GroupMessageEvent):
+        try:
+            await bot.send_group_forward_msg(
+                group_id=event.group_id, 
+                messages=custom_forward_msg(msg_list, bot.self_id)
+            )
+            logger.info(f"success, user: {event.user_id}, group: {group_id}, text: {text}")
+        except ActionFailed:
+            await gel.send("发送失败！账号可能被风控！", at_sender=True)
+            logger.info(f"ActionFailed, user: {event.user_id}, group: {group_id}, text: {text}")
+        except NetworkError:
+            await gel.send("发送失败！网络连接失败！", at_sender=True)
+            logger.info(f"NetworkError, user: {event.user_id}, group: {group_id}, text: {text}")
+    else:
+        for msg in msg_list:
+            try:
+                await gel.send(msg)
+                logger.info(f"success, user: {event.user_id}, text: {text}")
+            except ActionFailed:
+                await gel.send("发送失败！账号可能被风控！")
+                logger.info(f"ActionFailed, user: {event.user_id}, text: {text}")
+            except NetworkError:
+                await gel.send("发送失败！网络连接失败！")
+                logger.info(f"NetworkError, user: {event.user_id}, text: {text}")
+            await asyncio.sleep(1)
