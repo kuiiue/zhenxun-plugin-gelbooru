@@ -56,6 +56,7 @@ async def _(bot: Bot, event: MessageEvent, arg: Message=CommandArg()):
     if not urls:
         logger.info(f"search failure, text: {text}")
         await gel.finish("搜索出错！", at_sender=True)
+    msg_dict={}
     msg_list=[]
     for gel_id in urls:
         url=urls[gel_id]
@@ -64,13 +65,16 @@ async def _(bot: Bot, event: MessageEvent, arg: Message=CommandArg()):
         path=gel_path/tail
         if path.exists():
             logger.info(f"{tail}已存在")
-            msg_list.append(f"gelbooru_id: {gel_id}"+image(path))
+            msg_list.append(f"gelbooru_id: {gel_id}\n"+image(path))
+            msg_dict[gel_id]=f"gelbooru_id: {gel_id}\n"+image(path)
         else:
             if await AsyncHttpx.download_file(url, path):
                 resize_thumb(path)
-                msg_list.append(f"gelbooru_id: {gel_id}"+image(path))
+                msg_list.append(f"gelbooru_id: {gel_id}\n"+image(path))
+                msg_dict[gel_id]=f"gelbooru_id: {gel_id}\n"+image(path)
             else:
-                msg_list.append(f"gelbooru_id: {gel_id} 图片下载失败！")
+                msg_list.append(f"gelbooru_id: {gel_id}\n图片下载失败！")
+                msg_dict[gel_id]=f"gelbooru_id: {gel_id}\n图片下载失败！"
                 logger.info(f"id: {gel_id} download failure, text: {text}")
     if isinstance(event, GroupMessageEvent):
         try:
@@ -78,22 +82,23 @@ async def _(bot: Bot, event: MessageEvent, arg: Message=CommandArg()):
                 group_id=event.group_id, 
                 messages=custom_forward_msg(msg_list, bot.self_id)
             )
-            logger.info(f"success, user: {event.user_id}, group: {group_id}, text: {text}")
+            logger.info(f"success, user: {event.user_id}, group: {event.group_id}, text: {text}")
         except ActionFailed:
             await gel.send("发送失败！账号可能被风控！", at_sender=True)
-            logger.info(f"ActionFailed, user: {event.user_id}, group: {group_id}, text: {text}")
+            logger.info(f"ActionFailed, user: {event.user_id}, group: {event.group_id}, text: {text}")
         except NetworkError:
             await gel.send("发送失败！网络连接失败！", at_sender=True)
-            logger.info(f"NetworkError, user: {event.user_id}, group: {group_id}, text: {text}")
+            logger.info(f"NetworkError, user: {event.user_id}, group: {event.group_id}, text: {text}")
     else:
-        for msg in msg_list:
+        for gel_id in msg_dict:
+            msg=msg_dict[gel_id]
             try:
                 await gel.send(msg)
                 logger.info(f"success, user: {event.user_id}, text: {text}")
             except ActionFailed:
-                await gel.send("发送失败！账号可能被风控！")
+                await gel.send(f"gelbooru_id: {gel_id}\n发送失败！账号可能被风控！")
                 logger.info(f"ActionFailed, user: {event.user_id}, text: {text}")
             except NetworkError:
-                await gel.send("发送失败！网络连接失败！")
+                await gel.send(f"gelbooru_id: {gel_id}\n发送失败！网络连接失败！")
                 logger.info(f"NetworkError, user: {event.user_id}, text: {text}")
             await asyncio.sleep(1)
